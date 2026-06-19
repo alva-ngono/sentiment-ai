@@ -1,5 +1,5 @@
 IMAGE_NAME = sentiment-ai
-PORT = 8080
+PORT = 8081
 
 .PHONY: build run test stop clean tag
 

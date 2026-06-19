@@ -51,26 +51,25 @@ pipeline {
         }
 
         stage('Push') {
-            when {
-                expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
-            }
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'github-token',
-                    usernameVariable: 'REGISTRY_USER',
-                    passwordVariable: 'REGISTRY_PASS'
-                )]) {
-                    sh """
-                        echo \$REGISTRY_PASS | docker login ghcr.io -u \$REGISTRY_USER --password-stdin
-                        docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-                        docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:latest
-                        docker push ${REGISTRY}/${IMAGE_NAME}:latest
-                    """
-                }
-            }
+    when {
+        expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
+    }
+    steps {
+        withCredentials([usernamePassword(
+            credentialsId: 'github-token',
+            usernameVariable: 'REGISTRY_USER',
+            passwordVariable: 'REGISTRY_PASS'
+        )]) {
+            sh """
+                echo \$REGISTRY_PASS | docker login ghcr.io -u \$REGISTRY_USER --password-stdin
+                docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:latest
+                docker push ${REGISTRY}/${IMAGE_NAME}:latest
+            """
         }
     }
-
+}
     post {
         always {
             sh 'docker compose down -v 2>/dev/null || true'
