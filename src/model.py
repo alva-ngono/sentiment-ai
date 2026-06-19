@@ -6,9 +6,9 @@ class SentimentModel:
     def predict(self, text: str) -> dict:
         text_lower = text.lower()
         positive_words = ["bien", "super", "excellent", "parfait", "bon",
-                         "aime", "adore"]
+                          "aime", "adore"]
         negative_words = ["mal", "nul", "horrible", "mauvais", "déteste",
-                         "pire"]
+                          "pire"]
 
         # Compter les occurrences de mots positifs et négatifs
         pos = sum(1 for w in positive_words if w in text_lower)
