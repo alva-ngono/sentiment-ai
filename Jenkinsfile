@@ -141,17 +141,18 @@ pipeline {
             }
         }
 
-       stage('Deploy Staging') {
-    when {
-        expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
+        stage('Deploy Staging') {
+            when {
+                expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
+            }
+            steps {
+                echo "Deploiement de ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} en staging..."
+                sh 'docker compose -f docker-compose.yml -p staging down || true'
+                sh 'docker compose -f docker-compose.yml -p staging up -d'
+                echo "Staging disponible sur http://localhost:8081"
+            }
+        }
     }
-    steps {
-        echo "Deploiement de ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} en staging..."
-        sh 'docker compose -f docker-compose.yml -p staging down || true'
-        sh 'docker compose -f docker-compose.yml -p staging up -d'
-        echo "Staging disponible sur http://localhost:8081"
-    }
-}
 
     post {
         always {
