@@ -22,3 +22,8 @@ variable "registry" {
   type        = string
   default     = "ghcr.io/alva-ngono"
 }
+variable "docker_host" {
+  description = "Socket Docker (different entre machine locale et conteneur Jenkins)"
+  type        = string
+  default     = "npipe:////./pipe/docker_engine"
+}

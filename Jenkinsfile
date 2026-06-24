@@ -132,39 +132,19 @@ pipeline {
 
         stage('Push') {
             when {
-                expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
-            }
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'github-token',
-                    usernameVariable: 'REGISTRY_USER',
-                    passwordVariable: 'REGISTRY_PASS'
-                )]) {
-                    sh """
-                        echo \$REGISTRY_PASS | docker login ghcr.io -u \$REGISTRY_USER --password-stdin
-                        docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-                        docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-                        docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:latest
-                        docker push ${REGISTRY}/${IMAGE_NAME}:latest
-                    """
-                }
-            }
+         expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
+    }
+    steps {
+        dir('infra') {
+            sh 'terraform init -input=false'
+            sh """
+                terraform apply -auto-approve \
+                -var='image_tag=${IMAGE_TAG}' \
+                -var='docker_host=unix:///var/run/docker.sock'
+            """
         }
-
-        stage('IaC Apply') {
-            when {
-                expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
-            }
-            steps {
-                dir('infra') {
-                    sh 'terraform init -input=false'
-                    sh """
-                        terraform apply -auto-approve \
-                        -var='image_tag=${IMAGE_TAG}'
-                    """
-                }
-            }
-        }
+    }
+}
 
         stage('Deploy Staging') {
             when {
