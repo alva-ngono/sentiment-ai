@@ -172,6 +172,7 @@ pipeline {
                 expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
             }
             steps {
+                sh 'sleep 5'
                 sh 'docker exec sentiment-staging python -c "import urllib.request; urllib.request.urlopen(\'http://localhost:8000/health\')" || exit 1'
                 echo 'Staging deploye et healthy sur http://localhost:8001 (depuis la machine hote)'
             }
