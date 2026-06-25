@@ -132,29 +132,82 @@ pipeline {
 
         stage('Push') {
             when {
-         expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
-    }
-    steps {
-        dir('infra') {
-            sh 'terraform init -input=false'
-            sh """
-                terraform apply -auto-approve \
-                -var='image_tag=${IMAGE_TAG}' \
-                -var='docker_host=unix:///var/run/docker.sock'
-            """
+                expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
+            }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'github-token',
+                    usernameVariable: 'REGISTRY_USER',
+                    passwordVariable: 'REGISTRY_PASS'
+                )]) {
+                    sh """
+                        echo \$REGISTRY_PASS | docker login ghcr.io -u \$REGISTRY_USER --password-stdin
+                        docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                        docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:latest
+                        docker push ${REGISTRY}/${IMAGE_NAME}:latest
+                    """
+                }
+            }
         }
-    }
-}
+
+        stage('IaC Apply') {
+            when {
+                expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
+            }
+            steps {
+                dir('infra') {
+                    sh 'terraform init -input=false'
+                    sh """
+                        terraform apply -auto-approve \
+                        -var='image_tag=${IMAGE_TAG}' \
+                        -var='docker_host=unix:///var/run/docker.sock'
+                    """
+                }
+            }
+        }
 
         stage('Deploy Staging') {
             when {
                 expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
             }
             steps {
-        sh 'docker exec sentiment-staging python -c "import urllib.request; urllib.request.urlopen(\'http://localhost:8000/health\')" || exit 1'
-        echo 'Staging deploye et healthy sur http://localhost:8001 (depuis la machine hote)'
-    }
-}
+                sh 'docker exec sentiment-staging python -c "import urllib.request; urllib.request.urlopen(\'http://localhost:8000/health\')" || exit 1'
+                echo 'Staging deploye et healthy sur http://localhost:8001 (depuis la machine hote)'
+            }
+        }
+
+        stage('Smoke Test') {
+            when {
+                expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
+            }
+            steps {
+                sh '''
+                    echo "Attente demarrage (10s)..."
+                    sleep 10
+
+                    curl -f http://localhost:8001/health || exit 1
+                    echo "/health OK"
+
+                    curl -s http://localhost:8001/metrics | grep -q sentiment_predictions_total || exit 1
+                    echo "/metrics OK -- metriques SentimentAI presentes"
+
+                    sleep 20
+                    curl -s "http://localhost:9090/api/v1/query?query=up%7Bjob%3D%22sentiment-ai%22%7D" | grep -q '"value":\\[.*,"1"\\]' || exit 1
+                    echo "Prometheus scrape sentiment-ai : UP"
+
+                    curl -f http://localhost:3000/api/health || exit 1
+                    echo "Grafana OK"
+                '''
+            }
+            post {
+                failure {
+                    sh 'docker logs prometheus || true'
+                    sh 'docker logs sentiment-staging || true'
+                    echo 'Smoke Test KO -- voir logs ci-dessus'
+                }
+            }
+        }
     }
 
     post {
