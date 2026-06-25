@@ -18,7 +18,7 @@ resource "docker_container" "prometheus" {
   }
 
   volumes {
-    host_path      = abspath("${path.module}/../monitoring/prometheus.yml")
+    host_path      = "/var/lib/docker/volumes/jenkins-data/_data/workspace/sentiment-ai-pipeline/monitoring/prometheus.yml"
     container_path = "/etc/prometheus/prometheus.yml"
     read_only      = true
   }
