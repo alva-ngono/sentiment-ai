@@ -179,38 +179,36 @@ pipeline {
         }
 
         stage('Smoke Test') {
-            when {
-                expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
-            }
-            steps {
-                sh '''
-                    echo "Attente demarrage (10s)..."
-                    sleep 10
+    when {
+        expression { env.GIT_BRANCH == 'origin/main' || env.GIT_BRANCH == 'main' }
+    }
+    steps {
+        sh '''
+            echo "Attente demarrage (10s)..."
+            sleep 10
 
-                    curl -f http://localhost:8001/health || exit 1
-                    echo "/health OK"
+            docker exec sentiment-staging python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+            echo "/health OK"
 
-                    curl -s http://localhost:8001/metrics | grep -q sentiment_predictions_total || exit 1
-                    echo "/metrics OK -- metriques SentimentAI presentes"
+            docker exec sentiment-staging python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/metrics').read().decode())" | grep -q sentiment_predictions_total || exit 1
+            echo "/metrics OK -- metriques SentimentAI presentes"
 
-                    sleep 20
-                    curl -s "http://localhost:9090/api/v1/query?query=up%7Bjob%3D%22sentiment-ai%22%7D" | grep -q '"value":\\[.*,"1"\\]' || exit 1
-                    echo "Prometheus scrape sentiment-ai : UP"
+            sleep 20
+            docker exec prometheus wget -qO- "http://localhost:9090/api/v1/query?query=up%7Bjob%3D%22sentiment-ai%22%7D" | grep -q '"value":\\[.*,"1"\\]' || exit 1
+            echo "Prometheus scrape sentiment-ai : UP"
 
-                    curl -f http://localhost:3000/api/health || exit 1
-                    echo "Grafana OK"
-                '''
-            }
-            post {
-                failure {
-                    sh 'docker logs prometheus || true'
-                    sh 'docker logs sentiment-staging || true'
-                    echo 'Smoke Test KO -- voir logs ci-dessus'
-                }
-            }
+            docker exec grafana wget -qO- "http://localhost:3000/api/health" || exit 1
+            echo "Grafana OK"
+        '''
+    }
+    post {
+        failure {
+            sh 'docker logs prometheus || true'
+            sh 'docker logs sentiment-staging || true'
+            echo 'Smoke Test KO -- voir logs ci-dessus'
         }
     }
-
+}
     post {
         always {
             sh 'docker compose down -v 2>/dev/null || true'
