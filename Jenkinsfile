@@ -209,6 +209,7 @@ pipeline {
         }
     }
 }
+ }
     post {
         always {
             sh 'docker compose down -v 2>/dev/null || true'
